@@ -1,4 +1,3 @@
-use std::fs::exists;
 use std::sync::Arc;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
