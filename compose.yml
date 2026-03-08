@@ -1,0 +1,33 @@
+services:
+  axum_mongo:
+    build: .
+    container_name: axum_mongo
+    restart: unless-stopped
+    ports:
+      - "${PORT}:${PORT}"
+    depends_on:
+      - mongodb
+    environment:
+      - DATABASE_URL=mongodb://${MONGODB_INITDB_ROOT_USERNAME}:${MONGODB_INITDB_ROOT_PASSWORD}@mongodb:27017
+      - DATABASE_NAME=${DATABASE_NAME}
+      - PORT=${PORT}
+    env_file:
+      - .env
+  mongodb:
+    image: mongodb/mongodb-community-server:latest
+    container_name: mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    environment:
+      - MONGODB_INITDB_ROOT_USERNAME=${MONGODB_INITDB_ROOT_USERNAME}
+      - MONGODB_INITDB_ROOT_PASSWORD=${MONGODB_INITDB_ROOT_PASSWORD}
+    env_file:
+      - .env
+
+volumes:
+  mongodb_data:
+  mongodb_config:
