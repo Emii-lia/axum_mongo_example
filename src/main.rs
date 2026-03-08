@@ -14,6 +14,7 @@ mod dto;
 mod handler;
 mod state;
 mod routes;
+mod utils;
 
 #[tokio::main]
 async fn main() {
