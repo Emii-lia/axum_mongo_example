@@ -28,7 +28,7 @@ pub async fn create_car(
   State(state): State<Arc<AppState>>,
   Json(payload): Json<CreateCarDto>
 ) -> Result<Json<CarResponseDto>, (StatusCode, String)> {
-  let car_collection = state.db.collection("cars");
+  let car_collection: Collection<Car> = state.db.collection("cars");
   let user_collection: Collection<User> = state.db.collection("users");
 
   let new_car = Car {
@@ -37,13 +37,13 @@ pub async fn create_car(
     owner_id: ObjectId::parse_str(&payload.owner_id).map_err(|_| (StatusCode::BAD_REQUEST, "Invalid ObjectId".to_string()))?
   };
 
-  match car_collection.insert_one(new_car, None).await {
+  match car_collection.insert_one(&new_car).await {
     Ok(result) => {
       let car_id = result.inserted_id.as_object_id().unwrap();
-      let car = car_collection.find_one(doc! { "_id": car_id }, None).await
+      let car = car_collection.find_one(doc! { "_id": car_id }).await
         .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch car".to_string()))?
         .ok_or((StatusCode::NOT_FOUND, "Car not found".to_string()))?;
-      let owner= user_collection.find_one(doc! { "_id": car.owner_id }, None).await
+      let owner= user_collection.find_one(doc! { "_id": car.owner_id }).await
         .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch owner".to_string()))?
         .ok_or((StatusCode::NOT_FOUND, "Owner not found".to_string()))?;
 
@@ -88,14 +88,14 @@ pub async fn list_cars(
     ("owner.email", 1)
   ]));
 
-  let mut cursor = collection.aggregate(pipeline, None).await
+  let mut cursor = collection.aggregate(pipeline).await
     .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch cars".to_string()))?;
 
   let mut cars: Vec<CarResponseDto> = Vec::new();
 
   while let Some(result) = cursor.try_next().await
     .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch cars".to_string()))? {
-    let car: CarDetailsDto = bson::from_document(result)
+    let car: CarDetailsDto = bson::deserialize_from_document(result)
       .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to parse car data".to_string()))?;
 
     cars.push(CarResponseDto {
@@ -144,7 +144,7 @@ pub async fn list_cars_for_user(
     ("owner.email", 1)
   ]));
 
-  let mut cursor = collection.aggregate(pipeline, None).await
+  let mut cursor = collection.aggregate(pipeline).await
     .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch cars".to_string()))?;
 
   let mut cars: Vec<CarResponseDto> = Vec::new();
@@ -152,7 +152,7 @@ pub async fn list_cars_for_user(
   while let Some(result) = cursor.try_next().await
     .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch cars".to_string()))? {
 
-    let car: CarDetailsDto = bson::from_document(result)
+    let car: CarDetailsDto = bson::deserialize_from_document(result)
       .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to parse car data".to_string()))?;
 
     cars.push(CarResponseDto {
@@ -190,9 +190,9 @@ pub async fn get_car_by_id(
   let user_collection: Collection<Document> = state.db.collection("users");
   let object_id = ObjectId::parse_str(&id).map_err(|_| (StatusCode::BAD_REQUEST, "Invalid ObjectId".to_string()))?;
 
-  match car_collection.find_one(doc! { "_id": object_id }, None).await {
+  match car_collection.find_one(doc! { "_id": object_id }).await {
     Ok(Some(car)) => {
-      let owner = user_collection.find_one(doc! { "_id": car.owner_id }, None).await
+      let owner = user_collection.find_one(doc! { "_id": car.owner_id }).await
         .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch owner".to_string()))?;
 
       Ok(Json(CarResponseDto {
@@ -234,7 +234,7 @@ pub async fn update_car(
   let user_collection: Collection<Document> = state.db.collection("users");
   let object_id = ObjectId::parse_str(&id).map_err(|_| (StatusCode::BAD_REQUEST, "Invalid ObjectId".to_string()))?;
 
-  let existing_car = car_collection.find_one(doc! { "_id": object_id }, None).await
+  let existing_car = car_collection.find_one(doc! { "_id": object_id }).await
     .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch car".to_string()))?
     .ok_or((StatusCode::NOT_FOUND, "Car not found".to_string()))?;
 
@@ -244,9 +244,9 @@ pub async fn update_car(
     }
   };
 
-  match car_collection.update_one(doc! { "_id": object_id }, update, None).await {
+  match car_collection.update_one(doc! { "_id": object_id }, update).await {
     Ok(_) => {
-      let owner = user_collection.find_one(doc! { "_id": existing_car.owner_id }, None).await
+      let owner = user_collection.find_one(doc! { "_id": existing_car.owner_id }).await
         .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "Failed to fetch owner".to_string()))?;
 
       Ok(Json(CarResponseDto {
@@ -282,7 +282,7 @@ pub async fn delete_car(
 ) -> Result<StatusCode, (StatusCode, String)> {
   let collection: Collection<Car> = state.db.collection("cars");
   let object_id = ObjectId::parse_str(&id).map_err(|_| (StatusCode::BAD_REQUEST, "Invalid ObjectId".to_string()))?;
-  match collection.delete_one(doc! { "_id": object_id }, None).await {
+  match collection.delete_one(doc! { "_id": object_id }).await {
     Ok(_) => Ok(StatusCode::NO_CONTENT),
     Err(_) => Err((StatusCode::INTERNAL_SERVER_ERROR, "Failed to delete car".to_string()))
   }
